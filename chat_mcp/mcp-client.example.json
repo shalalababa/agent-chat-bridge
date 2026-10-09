@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "local-research-files": {
+      "command": "/path/to/agent-chat-bridge/.venv/bin/python",
+      "args": [
+        "/path/to/agent-chat-bridge/chat_mcp/server.py",
+        "--root",
+        "/path/to/agent-chat-bridge/exchange"
+      ]
+    }
+  }
+}
