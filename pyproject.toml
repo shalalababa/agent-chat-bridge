@@ -1,0 +1,11 @@
+[project]
+name = "agent-chat-bridge"
+version = "0.1.0"
+description = "Slack bridge to existing Claude Code and Codex sessions, plus a sandboxed file-exchange MCP server for ChatGPT chats"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["mcp==1.30.0", "websockets==16.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["slack_bridge", "chat_mcp"]
+pythonpath = ["slack_bridge", "chat_mcp"]
