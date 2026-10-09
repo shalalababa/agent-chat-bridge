@@ -1,0 +1,22 @@
+# systemd user unit. Install with:
+#   cp slack_bridge/agent-bridge.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now agent-bridge.service
+# Edit the paths below if the repository is not cloned at ~/agent-chat-bridge.
+# Slack tokens are read from ~/.config/agent-bridge/slack.env (mode 0600) by the
+# bridge itself, so they are not placed in the service environment.
+[Unit]
+Description=Slack Agent Bridge for registered Codex and Claude sessions
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/agent-chat-bridge/slack_bridge
+ExecStart=%h/agent-chat-bridge/.venv/bin/python -u %h/agent-chat-bridge/slack_bridge/bridge.py run
+Restart=always
+RestartSec=5
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

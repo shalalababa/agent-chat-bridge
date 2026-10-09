@@ -1,0 +1,12 @@
+#!/bin/sh
+# Single entry point. `run`, `send` and `status` go to bridge.py; list, discover,
+# add, edit, pause, resume and remove go to manage.py.
+# Symlink into PATH:  ln -s "$PWD/bin/agent-bridge" ~/.local/bin/agent-bridge
+here=$(dirname "$(readlink -f "$0")")
+app="$here/../slack_bridge"
+python=${AGENT_BRIDGE_PYTHON:-"$here/../.venv/bin/python"}
+[ -x "$python" ] || python=python3
+case "$1" in
+  run|send|status) exec "$python" "$app/bridge.py" "$@" ;;
+  *) exec "$python" "$app/manage.py" "$@" ;;
+esac

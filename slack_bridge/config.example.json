@@ -1,0 +1,22 @@
+{
+  "team": "TXXXXXXXXXX",
+  "bot": "UXXXXXXXXXX",
+  "users": ["UXXXXXXXXXX"],
+  "channels": ["CXXXXXXXXXX"],
+  "origin_thread": "00000000-0000-0000-0000-000000000000",
+  "revision": 0,
+  "agents": {
+    "astra": {
+      "kind": "codex",
+      "session": "00000000-0000-0000-0000-00000000000a",
+      "transcript": "/mnt/c/Users/YOU/.codex/sessions/2026/01/01/rollout-2026-01-01T00-00-00-00000000-0000-0000-0000-00000000000a.jsonl",
+      "label": "Research coordinator"
+    },
+    "fable": {
+      "kind": "claude",
+      "session": "00000000-0000-0000-0000-00000000000b",
+      "transcript": "/home/YOU/.claude/projects/-home-YOU-project/00000000-0000-0000-0000-00000000000b.jsonl",
+      "label": "Ops workspace"
+    }
+  }
+}
