@@ -1,18 +1,27 @@
 """Ensure the existing user service is live before accepting a peer send."""
 import json
+import os
 import subprocess
 import time
 
+from adapters import SLACK_KEYS
 from settings import SERVICE, STATE
 
 ACTIVATE_HINT = f'In WSL, run: systemctl --user start {SERVICE}; then retry.'
 HEALTH = STATE / 'health.json'
 
 
+def child_environment():
+    environment = os.environ.copy()
+    for key in SLACK_KEYS:
+        environment.pop(key, None)
+    return environment
+
+
 def service_state():
     result = subprocess.run(['systemctl', '--user', 'show', SERVICE,
                              '--property=ActiveState', '--property=MainPID'],
-                            capture_output=True, text=True, timeout=10, check=True)
+                            capture_output=True, text=True, timeout=10, check=True, env=child_environment())
     fields = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
     return fields.get('ActiveState'), int(fields.get('MainPID', '0'))
 
@@ -20,7 +29,7 @@ def service_state():
 def control(action):
     # systemd serializes concurrent starts and owns the single service process.
     subprocess.run(['systemctl', '--user', action, SERVICE],
-                   capture_output=True, text=True, timeout=15, check=True)
+                   capture_output=True, text=True, timeout=15, check=True, env=child_environment())
 
 
 def _check_running(health_path, timeout):

@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from adapters import Unavailable, readiness, slack_response, dispatch
 import struct
+import os
 
 
 class ReadinessTests(unittest.TestCase):
@@ -61,6 +62,20 @@ class ReadinessTests(unittest.TestCase):
                         readiness(agent, 'origin')
                 else:
                     self.assertIsNone(readiness(agent, 'origin'))
+
+    def test_codex_child_never_inherits_slack_tokens(self):
+        from adapters import codex_call
+        settings = {'args': ['C:\\node.exe', 'C:\\server.mjs'],
+                    'env': {'SLACK_BOT_TOKEN': 'from-app-settings', 'SLACK_APP_TOKEN': 'from-app-settings'}}
+        def inspect_child(*args, **kwargs):
+            self.assertNotIn('SLACK_BOT_TOKEN', kwargs['env'])
+            self.assertNotIn('SLACK_APP_TOKEN', kwargs['env'])
+            raise RuntimeError('child inspected')
+        with patch.dict(os.environ, {'SLACK_BOT_TOKEN': 'from-parent', 'SLACK_APP_TOKEN': 'from-parent'}), \
+             patch('adapters.app_tools_config', return_value=settings), \
+             patch('adapters.subprocess.Popen', side_effect=inspect_child):
+            with self.assertRaisesRegex(RuntimeError, 'child inspected'):
+                codex_call('read_thread', {}, 'origin')
 
 
 if __name__ == '__main__':

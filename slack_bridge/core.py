@@ -62,7 +62,7 @@ class Store:
                 payload['thread_ts'] = thread
             self.db.execute('insert or ignore into outbox(key,payload) values (?,?)', (entry_key, json.dumps(payload)))
 
-    def enqueue(self, key, sender, targets, body, channel, thread, agent_ids=None):
+    def enqueue(self, key, sender, targets, body, channel, thread, agent_ids=None, receipt=None):
         with self.db:
             if not self.db.execute('insert or ignore into events values (?)', (key,)).rowcount:
                 return []
@@ -73,6 +73,8 @@ class Store:
                 self.db.execute('insert into messages(id,sender,target,body,channel,thread,status,created,updated,agent_id) values (?,?,?,?,?,?,?,?,?,?)',
                                 (mid, sender, target, body, channel, thread, 'queued', now, now, (agent_ids or {}).get(target)))
                 ids.append(mid)
+            if receipt:
+                self.outbox('receipt:' + key, channel, thread, receipt)
             return ids
 
     def message(self, mid):

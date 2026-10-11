@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import time
 import unittest
@@ -58,3 +59,14 @@ class ServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'systemctl --user start agent-bridge.service'):
                 ensure_running(self.health, timeout=0)
             control.assert_called_once_with('start')
+
+    def test_systemctl_child_never_inherits_slack_tokens(self):
+        from service import service_state, control
+        def inspect_child(*args, **kwargs):
+            self.assertNotIn('SLACK_BOT_TOKEN', kwargs['env'])
+            self.assertNotIn('SLACK_APP_TOKEN', kwargs['env'])
+            return type('Result', (), {'stdout': 'ActiveState=active\nMainPID=123\n'})()
+        with patch.dict(os.environ, {'SLACK_BOT_TOKEN': 'from-parent', 'SLACK_APP_TOKEN': 'from-parent'}), \
+             patch('service.subprocess.run', side_effect=inspect_child):
+            self.assertEqual(service_state(), ('active', 123))
+            control('start')

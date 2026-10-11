@@ -91,11 +91,10 @@ class Bridge:
             with self.store.db:
                 self.store.outbox('help:' + key, e['channel'], thread, str(error))
             return
+        receipt = 'Queued for ' + ', '.join(x.title() + (' (paused)' if self.cfg['agents'][x].get('paused') else '') for x in targets) + '.'
         ids = self.store.enqueue(key, 'user:' + e['user'], targets, body, e['channel'], thread,
-                                 {n: a.get('id') for n, a in self.cfg['agents'].items()})
+                                 {n: a.get('id') for n, a in self.cfg['agents'].items()}, receipt)
         if ids:
-            with self.store.db:
-                self.store.outbox('receipt:' + key, e['channel'], thread, 'Queued for ' + ', '.join(x.title() + (' (paused)' if self.cfg['agents'][x].get('paused') else '') for x in targets) + '.')
             log('received', messages=ids, targets=targets)
 
     def prompt(self, msg):

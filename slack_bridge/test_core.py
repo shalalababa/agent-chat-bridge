@@ -1,6 +1,10 @@
+from contextlib import redirect_stdout
+import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from core import Store, parse_mention
 from bridge import Bridge
@@ -76,6 +80,34 @@ class BridgeTests(unittest.TestCase):
         bridge.receive(payload)
         bridge.receive(payload)
         self.assertEqual(self.store.db.execute('select count(*) from messages').fetchone()[0], 1)
+
+    def test_receipt_failure_rolls_back_event_before_socket_ack(self):
+        cfg = {'team': 'T', 'users': ['U'], 'channels': ['C'], 'bot': 'BOT',
+               'agents': {'astra': {}}}
+        bridge = Bridge(cfg, self.store)
+        payload = {'team_id': 'T', 'event': {'type': 'app_mention', 'user': 'U',
+                   'channel': 'C', 'ts': '1.2', 'text': '<@BOT> astra hello'}}
+        with patch.object(self.store, 'outbox', side_effect=RuntimeError('receipt write failed')):
+            with self.assertRaisesRegex(RuntimeError, 'receipt write failed'):
+                bridge.receive(payload)
+        self.assertEqual(self.store.db.execute('select count(*) from events').fetchone()[0], 0)
+        self.assertEqual(self.store.db.execute('select count(*) from messages').fetchone()[0], 0)
+        bridge.receive(payload)
+        self.assertEqual(self.store.db.execute('select count(*) from messages').fetchone()[0], 1)
+        self.assertEqual(self.store.db.execute("select count(*) from outbox where key like 'receipt:%'").fetchone()[0], 1)
+
+    def test_environment_tokens_are_not_written_to_queue_receipt_or_log(self):
+        cfg = {'team': 'T', 'users': ['U'], 'channels': ['C'], 'bot': 'BOT',
+               'agents': {'astra': {}}}
+        payload = {'team_id': 'T', 'event': {'type': 'app_mention', 'user': 'U',
+                   'channel': 'C', 'ts': '1.2', 'text': '<@BOT> astra hello'}}
+        output = io.StringIO()
+        with patch.dict(os.environ, {'SLACK_BOT_TOKEN': 'bot-test-secret',
+                                     'SLACK_APP_TOKEN': 'app-test-secret'}), redirect_stdout(output):
+            Bridge(cfg, self.store).receive(payload)
+        records = '\n'.join(self.store.db.iterdump()) + output.getvalue()
+        self.assertNotIn('bot-test-secret', records)
+        self.assertNotIn('app-test-secret', records)
 
     def test_reply_scanner_replays_after_restart_without_duplicate(self):
         import json

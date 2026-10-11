@@ -46,7 +46,10 @@ Read-only tools carry `readOnlyHint`; write tools carry `destructiveHint`.
   pruned automatically.
 - Single-user. SHA checks prevent accidental stale overwrites by the client;
   they are not a transaction against other local processes writing the same
-  file.
+  file. A concurrent local process can also move an already opened parent
+  directory outside the root; writes through its directory descriptor then
+  land at the new location. Keep the exchange tree free of concurrent local
+  renames while using the server.
 
 ## Connect an ordinary ChatGPT chat
 
@@ -80,7 +83,7 @@ by itself let the agent send prompts to ChatGPT chats.
 
 ## Tests
 
-`python -m pytest chat_mcp` (13 tests, temporary directories only): file
+`python -m pytest chat_mcp` (temporary directories only): file
 confinement, symlink and hard-link rejection, backups, stale writes, binary
 transfer, and real MCP round trips over a stdio subprocess and loopback
 Streamable HTTP.

@@ -94,13 +94,15 @@ milestones: `queued -> sending -> sent -> received -> complete`.
 
 - Incoming Slack events are written to SQLite before the Socket Mode ack and
   deduplicated by channel and timestamp (Slack can emit both `message` and
-  `app_mention` for one post).
+  `app_mention` for one post). The queued receipt is committed with the event.
 - One unconfirmed send per agent at a time; FIFO order is preserved even when
   the oldest message has a retry delay.
 - `received` requires a native incoming record in the exact session
   transcript (a Codex `send_message_to_thread` envelope bound to its turn ID,
   or a Claude Code inbound user record for that session), never
-  model-written acknowledgement text. It releases the next message.
+  model-written acknowledgement text. It releases the next message, even if
+  the first turn has not answered. A received message is never resent just
+  because its answer is missing.
 - Final answers carry `BRIDGE_REPLY <message id>` on their own line. The
   bridge accepts a prose preamble before it, ignores fenced or quoted
   examples and ambiguous multiple markers, strips the marker and posts the
@@ -110,7 +112,9 @@ milestones: `queued -> sending -> sent -> received -> complete`.
   after 120 seconds, becomes `uncertain`: it is reported in Slack, never
   blindly resent, and does not block later messages.
 - Slack posts go through a persistent outbox with idempotent keys and
-  exponential backoff. Socket Mode reconnects automatically.
+  exponential backoff. A post accepted by Slack just before a crash may be
+  sent again because its success was not recorded locally. Socket Mode
+  reconnects automatically.
 - Codex conversations that span several rollout files are followed through
   the desktop backend's thread index; replies already written in a new
   segment are recovered once.
@@ -166,7 +170,7 @@ systemd linger, the service stops with the user's login session.
 
 ## Tests
 
-`python -m pytest slack_bridge` (55 tests, no network). They cover routing,
+`python -m pytest slack_bridge` (no network). They cover routing,
 sender/channel filtering, durable deduplication, reply identity, restart
 during dispatch, transcript cursor replay and rollover, native receipts for
 both runtimes, quarantine of unconfirmed sends, registry edits, Slack modal

@@ -11,8 +11,8 @@ ChatGPT can hand each other prompts and reports as files.
 
 | Directory | What it is | Size |
 | --- | --- | --- |
-| [`slack_bridge/`](slack_bridge/README.md) | Socket Mode Slack daemon, SQLite queue and outbox, delivery adapters for Codex desktop and Claude Code sessions, transcript receipt reader, Slack Home tab and `/agents` manager, agent-to-agent `send` | ~1,400 lines of Python, 55 tests |
-| [`chat_mcp/`](chat_mcp/README.md) | MCP server (official Python SDK) exposing five file tools over stdio or loopback HTTP, confined to one root directory | ~210 lines of Python, 13 tests |
+| [`slack_bridge/`](slack_bridge/README.md) | Socket Mode Slack daemon, SQLite queue and outbox, delivery adapters for Codex desktop and Claude Code sessions, transcript receipt reader, Slack Home tab and `/agents` manager, agent-to-agent `send` | ~1,400 lines of Python |
+| [`chat_mcp/`](chat_mcp/README.md) | MCP server (official Python SDK) exposing five file tools over stdio or loopback HTTP, confined to one root directory | ~210 lines of Python |
 | `bin/agent-bridge` | Launcher: `run`/`send`/`status` go to the daemon, `list`/`add`/`edit`/`pause`/`resume`/`remove`/`discover` to the local manager | |
 
 ## Architecture
@@ -34,8 +34,9 @@ flowchart LR
     codex -- "reads report files" --> folder
 ```
 
-1. A Slack message starting with registered aliases is persisted, then
-   acknowledged, then queued once per recipient.
+1. A Slack message starting with registered aliases is queued once per
+   recipient, with its receipt, in one SQLite transaction before the Socket
+   Mode acknowledgement.
 2. The delivery loop checks the recipient is reachable and sends one message
    per agent at a time. The prompt carries a `BRIDGE_REPLY <id>` line for the
    agent's answer and links `slack_bridge/AGENT_GUIDE.md`.
@@ -126,9 +127,10 @@ This is a single-user tool for one person's own machine and Slack workspace.
   approve tool calls. Peer agent messages are labeled "no new user
   authorization" in the envelope; that label is advisory text to the model,
   not an enforcement mechanism.
-- **Secrets.** Slack tokens live in a 0600 file read per API call; they are
-  not put in the service environment and are stripped from the environment
-  of the Codex subprocess. Slack interaction `response_url`s are only
+- **Secrets.** The supplied service uses a 0600 token file read per API call
+  and does not set tokens in its environment. Environment token overrides
+  are also supported; token keys are stripped from child process
+  environments. Slack interaction `response_url`s are only
   followed over HTTPS to `slack.com` / `slack-gov.com`, without redirects.
 - **Local trust.** Delivery targets are identified by exact session ID; the
   Claude Code socket owner PID is verified with `SO_PEERCRED`; receipts are
@@ -144,7 +146,9 @@ This is a single-user tool for one person's own machine and Slack workspace.
 - **Sandbox root.** Relative paths only; `..`, absolute paths, `.git`,
   `.history`, symlinks and multiply hard-linked files are rejected; each
   component is opened with `O_NOFOLLOW` from a root directory descriptor;
-  8 MiB per file; no execution tool.
+  8 MiB per file; no execution tool. A concurrent local process that moves
+  an already opened directory outside the root can redirect a write there;
+  use a root that other local processes do not reorganize during MCP calls.
 
 ## Limitations
 
@@ -159,7 +163,8 @@ This is a single-user tool for one person's own machine and Slack workspace.
   the message is reported as delivered without a reply; nothing is
   forwarded.
 - No exactly-once guarantee across Slack network failures or external
-  runtimes; uncertain sends are flagged rather than retried.
+  runtimes; uncertain sends are flagged rather than retried. A Slack post
+  accepted just before a crash may be posted again from the outbox.
 - The bridge cannot start missing sessions, and the ChatGPT side cannot
   create new chats: each destination chat must exist with the connector
   enabled and its model chosen in ChatGPT.
@@ -169,12 +174,13 @@ This is a single-user tool for one person's own machine and Slack workspace.
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest          # 68 passed (55 slack_bridge, 13 chat_mcp)
+.venv/bin/python -m pytest
 ```
 
-No test touches Slack, OpenAI or the network: Slack calls and desktop
-adapters are mocked, transcripts are temporary files, and the MCP tests start
-the real server as a subprocess on stdio and on a random loopback port.
+No test contacts Slack, OpenAI or an external network service: Slack calls
+and desktop adapters are mocked, transcripts are temporary files, and the MCP
+tests start the real server as a subprocess on stdio and on a random loopback
+port.
 
 See [`docs/VALIDATION.md`](docs/VALIDATION.md) for what was validated against
 the real services, and [`CHANGELOG.md`](CHANGELOG.md) for the development

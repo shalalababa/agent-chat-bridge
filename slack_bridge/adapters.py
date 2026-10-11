@@ -154,9 +154,9 @@ def app_tools_config():
 def codex_call(name, arguments, origin_thread):
     settings = app_tools_config()
     environment = os.environ.copy()
+    environment.update(settings['env'])
     for key in SLACK_KEYS:
         environment.pop(key, None)  # never hand Slack tokens to the Codex subprocess
-    environment.update(settings['env'])
     environment['WSLENV'] = environment.get('WSLENV', '') + ':CODEX_APP_TOOLS_PIPE_PATH/w'
     node = settings['args'][-2]
     node = ('/mnt/' + node[0].lower() + node[2:].replace('\\', '/')).replace('//', '/')
